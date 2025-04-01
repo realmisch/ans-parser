@@ -38,7 +38,7 @@ def loadData():
                     contents[title] = pd.read_csv(f)['Record Number'].values
                 elif f.endswith('.xlsx'):
                     xls = pd.ExcelFile(f)
-                    temp = pd.read_excel(f, xls.sheet_names[0])['Record Number'].values
+                    temp = pd.read_excel(f, xls.sheet_names[-1])['Record Number'].values
                     contents[title] = temp
             else:
                 if f.endswith('.csv'):
