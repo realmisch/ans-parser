@@ -1,11 +1,19 @@
 ###############################################################################
-#       ANS DATA PARSER
-#       Created by Alex Nellis
-#       31-Mär-25
+#                            ANS DATA PARSER                                  #
+#                         Created by Alex Nellis                              #
+#                               31-Mär-25                                     #
+#                         Edited by Luiz Aldeia                               #
+#                               01-Abr-25                                     #
 ###############################################################################
 
 import os
 import pandas as pd
+import numpy as np
+import holoviews as hv
+from holoviews import dim
+
+# Enable the Bokeh extension for Holoviews (this allows interactive plots in the browser)
+hv.extension('bokeh')
 
 cwd = os.getcwd()
 data_loc = cwd + '/data/'
@@ -29,24 +37,40 @@ def loadData():
     member_list = {}
     
     for file in os.listdir(data_loc):
+        #some files uses 'Record Number' and others 'Account: ANS ID', this will take care
+        #of this problem when accessing the member ID
         f = os.path.join(data_loc,file)
         if os.path.isfile(f):
             title = f.split('/')[-1].split('-20')[-1][2:].split('.')[0]
             if 'member' not in f:
                 labels.append(title)
                 if f.endswith('.csv'):
-                    contents[title] = pd.read_csv(f)['Record Number'].values
+                    df = pd.read_csv(f)
                 elif f.endswith('.xlsx'):
                     xls = pd.ExcelFile(f)
-                    temp = pd.read_excel(f, xls.sheet_names[0])['Record Number'].values
-                    contents[title] = temp
+                    df = pd.read_excel(f, xls.sheet_names[-1])
+                else:
+                    continue
+                
+                if 'Record Number' in df.columns:
+                    contents[title] = df['Record Number'].values
+                elif 'Account: ANS ID' in df.columns:
+                    contents[title] = df['Account: ANS ID'].values
             else:
                 if f.endswith('.csv'):
-                    member_list[title] = pd.read_csv(f)['Record Number'].values
+                    df = pd.read_csv(f)
                 elif f.endswith('.xlsx'):
                     xls = pd.ExcelFile(f)
-                    member_list[title] = pd.read_excel(f, xls.sheet_names[-1])['Record Number'].values
+                    df = pd.read_excel(f, xls.sheet_names[-1])
+                else:
+                    continue
+                
+                if 'Record Number' in df.columns:
+                    member_list[title] = df['Record Number'].values
+                elif 'Account: ANS ID' in df.columns:
+                    member_list[title] = df['Account: ANS ID'].values
     return labels, contents, member_list
+
 
 def getYear(year, total_members_list, total_meetings_list):
     """
@@ -155,14 +179,129 @@ def totalAttendance(attendance, meetings, exclude = None):
     result = attendance[mask]
     return result, result.shape[0]
 
-#"labels" contains the keys for meetings that can be used in totalAttendance
-labels, contents, members = loadData()
-attendance = getAttendance(*getYear(2024, members, contents))
-result, total = totalAttendance(attendance, ['2024 NETS','2024 PBNC'])
+def generateChordDiagram(attendance, selected_meetings, year):
+    """
+    Generate an interactive chord diagram showing the correlation between the selected meetings
+    and save it as an HTML file.
+    """
 
-
-
-
-
-
+    meetings_names = [meeting.split(' ', 1)[1] for meeting in selected_meetings if ' ' in meeting]
     
+
+    overlap_matrix = np.zeros((len(meetings_names), len(meetings_names)))
+    
+
+    for i, meeting_i in enumerate(meetings_names):
+        for j, meeting_j in enumerate(meetings_names):
+            if i == j:
+                continue
+            column_i = f"{year} {meeting_i}"
+            column_j = f"{year} {meeting_j}"
+
+            # Check if both columns exist before proceeding
+            if column_i in attendance.columns and column_j in attendance.columns:
+                overlap = (attendance[column_i] & attendance[column_j]).sum()
+                overlap_matrix[i, j] = overlap
+            else:
+                print(f"Warning: Columns {column_i} or {column_j} not found in the attendance data for {year}. Skipping pair.")
+
+
+    links = []
+    for i in range(len(meetings_names)):
+        for j in range(i + 1, len(meetings_names)):
+            if overlap_matrix[i, j] > 0:
+                links.append({
+                    'source': meetings_names[i], 
+                    'target': meetings_names[j], 
+                    'value': overlap_matrix[i, j]
+                })
+    
+    links_df = pd.DataFrame(links)
+
+    chord = hv.Chord(links_df).opts(
+        labels='index', 
+        cmap='Category10',
+        edge_cmap='Category10',
+        edge_color=dim('source').str(),  
+        node_color=dim('index').str(), 
+        width=800, 
+        height=800,  
+        node_radius=0.025,  
+        padding=1,  
+        title=f"{year} Meeting Correlations",  
+        label_text_font_size='12pt',  
+        edge_line_width=3 
+    )
+    
+    hv.save(chord, f'chord_diagram_overlap_{year}.html')
+    print(f"Chord diagram saved as 'chord_diagram_{year}.html'")
+    return chord
+
+
+
+
+if __name__ == "__main__":
+    while True:
+        print()
+        year = input("Enter the year to be analyzed: ").strip()
+        labels, contents, members = loadData()
+        available_meetings = [label.replace(year, '').strip() for label in labels if year in label]
+        
+        if available_meetings:
+            break
+        else:
+            print(f"No meeting data found for {year}. Please enter a valid year.")
+    
+    while True:
+        print()
+        print("The following meeting data are available:")
+        print(" ".join(available_meetings) + " ALL")
+        print()
+        meetings_input = input("Which meeting(s) should be analyzed (separate by commas): ").strip().upper()
+        
+        if meetings_input == "ALL":
+            selected_meetings = [f"{year} {m}" for m in available_meetings]
+            break
+        else:
+            selected_meetings = [f"{year} {m.strip().upper()}" for m in meetings_input.split(',') if m.strip().upper() in map(str.upper, available_meetings)]
+        
+        invalid_meetings = [m.strip().upper() for m in meetings_input.split(',') if m.strip().upper() not in map(str.upper, available_meetings)]
+        
+        if not invalid_meetings:
+            break
+        else:
+            print()
+            print(f"The following meetings are not on the list: {', '.join(invalid_meetings)}")
+            print("Please enter the meeting names again.")
+    
+    print()
+    print("Selected conferences:", selected_meetings)
+    
+    attendance = getAttendance(*getYear(year, members, contents))
+    
+    attendance_filename = f"{year}_attendance.csv"
+    attendance.to_csv(attendance_filename, index=True)
+    print(f"Attendance data saved to {attendance_filename}")
+    
+    result, total = totalAttendance(attendance, selected_meetings)
+
+    print()
+    print(total," members participated in all the selected meetings")
+    print()
+    print(result)
+    
+    if total > 0:
+        print()
+        output_filename = input("Enter the output file name for the results (including .csv extension): ").strip()
+        result.to_csv(output_filename, index=True)
+        print(f"Results saved to {output_filename}")
+
+    if meetings_input == "ALL":
+        print()
+        print("Generating chord diagram for meeting correlations...")
+        generateChordDiagram(attendance, selected_meetings, year)
+        print("Chord diagram generated.")
+        overlap = attendance[attendance.sum(axis=1) > 1]
+        overlap_filename = f"{year}_attendance_overlap.csv"
+        overlap.to_csv(overlap_filename, index=True)
+        print(f"Overlap attendance data saved to {overlap_filename}")
