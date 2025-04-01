@@ -235,15 +235,13 @@ def generateChordDiagram(attendance, selected_meetings, year):
     
     hv.save(chord, f'chord_diagram_overlap_{year}.html')
     print(f"Chord diagram saved as 'chord_diagram_{year}.html'")
-    return chord
 
 
 
 
 if __name__ == "__main__":
     while True:
-        print()
-        year = input("Enter the year to be analyzed: ").strip()
+        year = input("\nEnter the year to be analyzed: ").strip()
         labels, contents, members = loadData()
         available_meetings = [label.replace(year, '').strip() for label in labels if year in label]
         
@@ -253,10 +251,7 @@ if __name__ == "__main__":
             print(f"No meeting data found for {year}. Please enter a valid year.")
     
     while True:
-        print()
-        print("The following meeting data are available:")
-        print(" ".join(available_meetings) + " ALL")
-        print()
+        print("\nThe following meeting data are available:\n\t" + " ".join(available_meetings) + " ALL\n")
         meetings_input = input("Which meeting(s) should be analyzed (separate by commas): ").strip().upper()
         
         if meetings_input == "ALL":
@@ -270,35 +265,28 @@ if __name__ == "__main__":
         if not invalid_meetings:
             break
         else:
-            print()
-            print(f"The following meetings are not on the list: {', '.join(invalid_meetings)}")
-            print("Please enter the meeting names again.")
+            print(f"\nThe following meetings are not on the list: {', '.join(invalid_meetings)}\nPlease enter the meeting names again.")
     
-    print()
-    print("Selected conferences:", selected_meetings)
+    print("\nSelected conferences:", selected_meetings)
     
     attendance = getAttendance(*getYear(year, members, contents))
     
     attendance_filename = f"{year}_attendance.csv"
     attendance.to_csv(attendance_filename, index=True)
-    print(f"Attendance data saved to {attendance_filename}")
+    print(f"Attendance data saved to {attendance_filename}\n")
     
     result, total = totalAttendance(attendance, selected_meetings)
 
-    print()
-    print(total," members participated in all the selected meetings")
-    print()
+    print(total," members participated in all the selected meetings\n")
     print(result)
     
     if total > 0:
-        print()
-        output_filename = input("Enter the output file name for the results (including .csv extension): ").strip()
+        output_filename = input("\nEnter the output file name for the results (including .csv extension): ").strip()
         result.to_csv(output_filename, index=True)
         print(f"Results saved to {output_filename}")
 
     if meetings_input == "ALL":
-        print()
-        print("Generating chord diagram for meeting correlations...")
+        print("\nGenerating chord diagram for meeting correlations...")
         generateChordDiagram(attendance, selected_meetings, year)
         print("Chord diagram generated.")
         overlap = attendance[attendance.sum(axis=1) > 1]
