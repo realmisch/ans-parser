@@ -189,14 +189,15 @@ def generateChordDiagram(attendance, selected_meetings, year):
     
 
     overlap_matrix = np.zeros((len(meetings_names), len(meetings_names)))
-    
+    overlap_diag = np.zeros(len(meetings_names))
 
     for i, meeting_i in enumerate(meetings_names):
         for j, meeting_j in enumerate(meetings_names):
-            if i == j:
-                continue
             column_i = f"{year} {meeting_i}"
             column_j = f"{year} {meeting_j}"
+            if i == j:
+                overlap_diag[i] = (attendance[column_i]).sum()
+                continue
 
             # Check if both columns exist before proceeding
             if column_i in attendance.columns and column_j in attendance.columns:
@@ -235,6 +236,7 @@ def generateChordDiagram(attendance, selected_meetings, year):
     
     hv.save(chord, f'chord_diagram_overlap_{year}.html')
     print(f"Chord diagram saved as 'chord_diagram_{year}.html'")
+    return overlap_matrix + np.diag(overlap_diag)
 
 
 
@@ -287,8 +289,15 @@ if __name__ == "__main__":
 
     if meetings_input == "ALL":
         print("\nGenerating chord diagram for meeting correlations...")
-        generateChordDiagram(attendance, selected_meetings, year)
+        matrix = generateChordDiagram(attendance, selected_meetings, year)
         print("Chord diagram generated.")
+        for i in range(len(matrix)):
+            matrix[i] /= matrix[i,i]
+        table_filename = f"{year}_overlap_table.csv"
+        overlap_table = pd.DataFrame(data = matrix*100, index = selected_meetings, columns = selected_meetings)
+        overlap_table.to_csv(table_filename, index = True)
+        print("Overlap Table data saved to {table_filename}")
+        
         overlap = attendance[attendance.sum(axis=1) > 1]
         overlap_filename = f"{year}_attendance_overlap.csv"
         overlap.to_csv(overlap_filename, index=True)
