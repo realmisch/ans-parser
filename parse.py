@@ -290,7 +290,6 @@ if __name__ == "__main__":
     if meetings_input == "ALL":
         print("\nGenerating chord diagram for meeting correlations...")
         matrix = generateChordDiagram(attendance, selected_meetings, year)
-        print("Chord diagram generated.")
         for i in range(len(matrix)):
             matrix[i] /= matrix[i,i]
         matrix *= 100
