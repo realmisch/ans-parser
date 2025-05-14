@@ -293,8 +293,9 @@ if __name__ == "__main__":
         print("Chord diagram generated.")
         for i in range(len(matrix)):
             matrix[i] /= matrix[i,i]
+        matrix *= 100
         table_filename = f"{year}_overlap_table.csv"
-        overlap_table = pd.DataFrame(data = matrix*100, index = selected_meetings, columns = selected_meetings)
+        overlap_table = pd.DataFrame(data = matrix, index = selected_meetings, columns = selected_meetings)
         overlap_table.to_csv(table_filename, index = True)
         print("Overlap Table data saved to {table_filename}")
         
